@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from './store/useStore';
 import { Installer } from './components/Installer';
 import { Dashboard } from './components/Dashboard';
@@ -10,7 +9,7 @@ import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2, AlertT
 import { Project } from './types';
 
 // --- GLOBAL ERROR BOUNDARY ---
-class GlobalErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+class GlobalErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   state: {hasError: boolean, error: Error | null} = { hasError: false, error: null };
   static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   componentDidCatch(error: Error, errorInfo: any) { console.error("Uncaught error:", error, errorInfo); }
@@ -87,8 +86,19 @@ const NavItem = ({ icon, label, active = false }: { icon: any, label: string, ac
 );
 
 const AppContent: React.FC = () => {
-  const { isInstalled, currentUser, currentProject, login, _hasHydrated } = useStore();
+  const { isInstalled, currentUser, currentProject, login, _hasHydrated, setHasHydrated } = useStore();
   const [viewerMode, setViewerMode] = useState<{ active: boolean; projectId?: string; projectData?: Project } | null>(null);
+
+  // Safety: Force hydration if it hangs
+  useEffect(() => {
+    if (!_hasHydrated) {
+      const timer = setTimeout(() => {
+        console.warn("Forcing hydration due to timeout");
+        setHasHydrated(true);
+      }, 500); // 0.5s timeout
+      return () => clearTimeout(timer);
+    }
+  }, [_hasHydrated, setHasHydrated]);
 
   // Initial Route Check
   useEffect(() => {
@@ -97,7 +107,6 @@ const AppContent: React.FC = () => {
       const path = window.location.pathname;
       if (path.startsWith('/v/')) {
         const id = path.split('/v/')[1];
-        // Check for SSR Injected Data first
         if ((window as any).__INITIAL_PROJECT__ && (window as any).__INITIAL_PROJECT__.id === id) {
            setViewerMode({ active: true, projectData: (window as any).__INITIAL_PROJECT__ });
            return;
@@ -148,7 +157,6 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // 0. Public Viewer Route (No Hydration/Auth needed for pure view if data present)
   if (viewerMode?.active) {
     return <Viewer projectId={viewerMode.projectId} projectData={viewerMode.projectData} />;
   }

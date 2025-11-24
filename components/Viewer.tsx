@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, Component } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, Gltf, Image as DreiImage, Text } from '@react-three/drei';
 import { useStore } from '../store/useStore';
@@ -7,7 +7,7 @@ import { Play, AlertCircle, AlertTriangle } from 'lucide-react';
 import { SceneObject, Project } from '../types';
 
 // Error Boundary specifically for the Viewer Scene to prevent whole-app crash
-class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+class SceneErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state: { hasError: boolean } = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
   render() {

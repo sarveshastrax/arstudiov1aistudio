@@ -1,10 +1,13 @@
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const bodyParser = require('body-parser');
+// --- ESM COMPATIBILITY FIX ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 // --- DIRECTORY SETUP ---
 const DATA_DIR = path.join(__dirname, 'data');
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
-const BUILD_DIR = path.join(__dirname, 'dist'); // Vite build output
+const BUILD_DIR = path.join(__dirname, 'dist'); 
 
 const DB_FILES = {
   users: path.join(DATA_DIR, 'users.json'),
@@ -20,7 +23,7 @@ const DB_FILES = {
 };
 
 // Ensure directories exist
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Initialize DB Files if missing
@@ -29,7 +32,7 @@ if (!fs.existsSync(DB_FILES.projects)) fs.writeFileSync(DB_FILES.projects, '[]')
 
 // --- MIDDLEWARE ---
 app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb' })); // Replaces body-parser
 
 // 1. Serve Uploaded Assets (Public)
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -41,7 +44,10 @@ app.use(express.static(BUILD_DIR));
 const db = {
   read: (file) => {
     try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (fs.existsSync(file)) {
+        return JSON.parse(fs.readFileSync(file, 'utf8'));
+      }
+      return [];
     } catch (e) { return []; }
   },
   write: (file, data) => {
@@ -51,11 +57,12 @@ const db = {
 
 // --- API ROUTES ---
 
+// Health Check
+app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
 // Auth: Login
 app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  // Mock Auth - In production, use bcrypt and JWT
-  // For now, allow admin login or generic user
+  const { email } = req.body;
   const user = {
     id: 'usr_' + Date.now(),
     email: email,
@@ -114,11 +121,9 @@ app.post('/api/projects', (req, res) => {
 });
 
 // --- SPA ROUTING (SSR LITE) ---
-// This handles the "Black Screen" issue by ensuring sub-routes serve index.html
 app.get('*', (req, res) => {
   const indexPath = path.join(BUILD_DIR, 'index.html');
   
-  // Basic SSR: Inject Meta Tags for View Routes
   if (req.path.startsWith('/v/')) {
     const projectId = req.path.split('/v/')[1];
     const projects = db.read(DB_FILES.projects);
@@ -127,7 +132,6 @@ app.get('*', (req, res) => {
     if (project && fs.existsSync(indexPath)) {
       let html = fs.readFileSync(indexPath, 'utf8');
       
-      // Inject SEO
       const seoTags = `
         <title>${project.name}</title>
         <meta property="og:title" content="${project.name}" />
@@ -135,7 +139,6 @@ app.get('*', (req, res) => {
         <script>window.__INITIAL_PROJECT__ = ${JSON.stringify(project)};</script>
       `;
       
-      // Naive replacement - in production use a parser or specific placeholder
       html = html.replace('<!--SEO_START-->', '').replace('<!--SEO_END-->', '');
       html = html.replace('<title>Adhvyk AR Studio</title>', seoTags);
       
@@ -143,7 +146,6 @@ app.get('*', (req, res) => {
     }
   }
 
-  // Fallback for all other routes
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
@@ -152,6 +154,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Serving static files from ${BUILD_DIR}`);
 });
