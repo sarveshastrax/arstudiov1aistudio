@@ -5,7 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { Editor } from './components/Editor';
 import { Viewer } from './components/Viewer';
 import { api } from './services/api';
-import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2, AlertTriangle } from 'lucide-react';
+import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { Project } from './types';
 
 // --- GLOBAL ERROR BOUNDARY ---
@@ -90,15 +90,23 @@ const NavItem = ({ icon, label, active = false }: { icon: any, label: string, ac
 const AppContent: React.FC = () => {
   const { isInstalled, currentUser, currentProject, login, _hasHydrated, setHasHydrated } = useStore();
   const [viewerMode, setViewerMode] = useState<{ active: boolean; projectId?: string; projectData?: Project } | null>(null);
+  const [showReset, setShowReset] = useState(false);
 
   // Safety: Force hydration if it hangs
   useEffect(() => {
     if (!_hasHydrated) {
       const timer = setTimeout(() => {
-        console.warn("Forcing hydration due to timeout");
         setHasHydrated(true);
-      }, 500); // 0.5s timeout
-      return () => clearTimeout(timer);
+      }, 2000); // 2s timeout - Force load
+      
+      const showResetTimer = setTimeout(() => {
+         setShowReset(true);
+      }, 5000); // 5s timeout - Show reset button
+
+      return () => {
+         clearTimeout(timer);
+         clearTimeout(showResetTimer);
+      };
     }
   }, [_hasHydrated, setHasHydrated]);
 
@@ -169,6 +177,16 @@ const AppContent: React.FC = () => {
        <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-neutral-500">
          <Loader2 className="animate-spin text-white" size={32} />
          <span className="text-xs uppercase tracking-widest">Initializing Studio...</span>
+         
+         {showReset && (
+            <button 
+              onClick={() => setHasHydrated(true)}
+              className="mt-4 flex items-center gap-2 px-4 py-2 bg-neutral-800 rounded text-white text-xs font-bold hover:bg-neutral-700 animate-in fade-in"
+            >
+               <RefreshCcw size={14} />
+               Force Start
+            </button>
+         )}
        </div>
     );
   }
