@@ -1,0 +1,8 @@
+{
+  "name": "Adhvyk AR Studio v1",
+  "description": "Professional WebAR SaaS Platform. Create, Edit, and Publish AR experiences with a minimalist enterprise workflow.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
