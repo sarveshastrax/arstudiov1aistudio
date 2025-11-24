@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Project, User, InstallConfig, SceneObject, Asset } from '../types';
 import { api } from '../services/api';
+import { storage } from '../utils/storage';
 
-// Initial Mock Data (Using Public URLs for reliability across devices)
+// Initial Mock Data
 const INITIAL_PROJECTS: Project[] = [
   {
     id: 'demo_1',
@@ -23,6 +24,9 @@ const INITIAL_ASSETS: Asset[] = [
 
 interface AppState {
   // System State
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
+
   isInstalled: boolean;
   installConfig: InstallConfig;
   setInstalled: (status: boolean) => void;
@@ -65,6 +69,9 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
+
       // System
       isInstalled: false, 
       installConfig: {
@@ -108,7 +115,6 @@ export const useStore = create<AppState>()(
       })),
 
       closeProject: () => {
-         // Auto-save on close
          get().saveCurrentProject();
          set({ currentProject: null });
       },
@@ -122,12 +128,10 @@ export const useStore = create<AppState>()(
              lastModified: 'Just now'
          };
          
-         // Optimistic Update
          set({
              projects: projects.map(p => p.id === updatedProject.id ? updatedProject : p)
          });
 
-         // API Call
          await api.saveProject(updatedProject);
       },
       
@@ -200,13 +204,16 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'adhvyk-ar-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => storage), // Use IndexedDB Wrapper
       partialize: (state) => ({
         isInstalled: state.isInstalled,
         currentUser: state.currentUser,
         projects: state.projects,
         assets: state.assets
-      })
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      }
     }
   )
 );

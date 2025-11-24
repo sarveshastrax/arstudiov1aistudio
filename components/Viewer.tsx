@@ -7,7 +7,7 @@ import { Play, AlertCircle, AlertTriangle } from 'lucide-react';
 import { SceneObject, Project } from '../types';
 
 // Error Boundary specifically for the Viewer Scene to prevent whole-app crash
-class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+class SceneErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
   render() {

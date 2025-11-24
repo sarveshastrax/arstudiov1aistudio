@@ -6,7 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { Editor } from './components/Editor';
 import { Viewer } from './components/Viewer';
 import { api } from './services/api';
-import { Layout, Menu, Settings, LogOut, Code, User as UserIcon } from 'lucide-react';
+import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2 } from 'lucide-react';
 import { Project } from './types';
 
 // Sidebar component extracted here for App layout
@@ -62,7 +62,7 @@ const NavItem = ({ icon, label, active = false }: { icon: any, label: string, ac
 );
 
 const App: React.FC = () => {
-  const { isInstalled, currentUser, currentProject, login } = useStore();
+  const { isInstalled, currentUser, currentProject, login, _hasHydrated } = useStore();
   const [viewerMode, setViewerMode] = useState<{ active: boolean; projectId?: string; projectData?: Project } | null>(null);
 
   // Initial Route Check
@@ -72,7 +72,12 @@ const App: React.FC = () => {
       const path = window.location.pathname;
       if (path.startsWith('/v/')) {
         const id = path.split('/v/')[1];
-        // If we have a server, try to fetch the project data immediately
+        // Check for SSR Injected Data first
+        if ((window as any).__INITIAL_PROJECT__ && (window as any).__INITIAL_PROJECT__.id === id) {
+           setViewerMode({ active: true, projectData: (window as any).__INITIAL_PROJECT__ });
+           return;
+        }
+
         try {
            const project = await api.getProjectById(id);
            if (project) {
@@ -86,7 +91,7 @@ const App: React.FC = () => {
         return;
       }
 
-      // 2. Hash Routing (Legacy/Static) -> #/v?p=...
+      // 2. Hash Routing (Legacy/Static)
       const hash = window.location.hash;
       if (hash.startsWith('#/v?')) {
         try {
@@ -118,9 +123,20 @@ const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // 0. Public Viewer Route
+  // 0. Public Viewer Route (No Hydration/Auth needed for pure view if data present)
   if (viewerMode?.active) {
     return <Viewer projectId={viewerMode.projectId} projectData={viewerMode.projectData} />;
+  }
+
+  // WAIT FOR HYDRATION (IndexedDB loading)
+  // This prevents flickering of the Installer if persistence hasn't loaded yet
+  if (!_hasHydrated) {
+    return (
+       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-neutral-500">
+         <Loader2 className="animate-spin text-white" size={32} />
+         <span className="text-xs uppercase tracking-widest">Initializing Studio...</span>
+       </div>
+    );
   }
 
   // 1. Installer Check
@@ -132,8 +148,15 @@ const App: React.FC = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-full max-w-md bg-surface border border-border p-8 rounded-xl">
-           <h2 className="text-2xl font-bold text-white mb-6 text-center">Sign In</h2>
+        <div className="w-full max-w-md bg-surface border border-border p-8 rounded-xl shadow-2xl">
+           <div className="flex justify-center mb-6">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
+                <Code size={28} className="text-black" />
+              </div>
+           </div>
+           <h2 className="text-2xl font-bold text-white mb-2 text-center">Welcome Back</h2>
+           <p className="text-neutral-400 text-center mb-8 text-sm">Sign in to access your AR Studio dashboard.</p>
+           
            <button 
              onClick={() => login({ id: '1', name: 'Sarvesh', email: 'admin@adhvyk.com', role: 'ADMIN', plan: 'PRO' })}
              className="w-full bg-white text-black font-bold py-3 rounded hover:bg-neutral-200 transition-colors"

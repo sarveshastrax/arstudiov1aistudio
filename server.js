@@ -20,8 +20,10 @@ if (!fs.existsSync(PROJECTS_FILE)) fs.writeFileSync(PROJECTS_FILE, '[]');
 // Middleware
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'build')));
-// Serve uploads publicly
+
+// Serve static assets first (build folder)
+// IMPORTANT: Do not serve index.html automatically for /v/:id routes
+app.use(express.static(path.join(__dirname, 'build'), { index: false }));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // --- API ROUTES ---
@@ -42,7 +44,6 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
-  // Return the public URL
   const publicUrl = `/uploads/${req.file.filename}`;
   res.json({ 
     url: publicUrl,
@@ -82,28 +83,71 @@ app.post('/api/projects', (req, res) => {
   }
 });
 
-// 4. Get Single Project (For Viewer)
+// 4. Get Single Project
 app.get('/api/projects/:id', (req, res) => {
   try {
     const data = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf8'));
     const project = data.find(p => p.id === req.params.id);
-    if (project) {
-      res.json(project);
-    } else {
-      res.status(404).json({ error: 'Project not found' });
-    }
+    if (project) res.json(project);
+    else res.status(404).json({ error: 'Project not found' });
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
   }
 });
 
-// --- CLIENT ROUTING ---
-// Handle React Routing, return index.html for any unknown route
+// --- SSR / CLIENT ROUTING ---
+
+// Handle Viewer Route with SSR (Data Injection)
+app.get('/v/:id', (req, res) => {
+  const projectId = req.params.id;
+  const indexPath = path.join(__dirname, 'build', 'index.html');
+
+  fs.readFile(indexPath, 'utf8', (err, html) => {
+    if (err) return res.status(500).send('Error loading app');
+
+    // Try to find project for SEO tags
+    let project = null;
+    try {
+      const data = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf8'));
+      project = data.find(p => p.id === projectId);
+    } catch (e) {}
+
+    if (project) {
+      // Inject SEO Meta Tags
+      const seoTags = `
+        <title>${project.name} | Adhvyk AR</title>
+        <meta name="description" content="View this AR experience created with Adhvyk AR Studio." />
+        <meta property="og:title" content="${project.name}" />
+        <meta property="og:description" content="Interactive Augmented Reality Experience." />
+        <meta property="og:image" content="${project.thumbnail}" />
+        <meta property="twitter:card" content="summary_large_image" />
+      `;
+      
+      // Inject Data so client doesn't need to fetch
+      const dataInjection = `
+        <script>
+          window.__INITIAL_PROJECT__ = ${JSON.stringify(project)};
+        </script>
+      `;
+
+      // Replace placeholders
+      let finalHtml = html.replace('<!--SEO_START-->', '').replace('<!--SEO_END-->', ''); // Remove default block if needed
+      finalHtml = finalHtml.replace('<title>Adhvyk AR Studio</title>', seoTags); 
+      finalHtml = finalHtml.replace('<!--DATA_INJECTION_POINT-->', dataInjection);
+      
+      res.send(finalHtml);
+    } else {
+      // Send default if project not found (let client handle 404 UI)
+      res.sendFile(indexPath);
+    }
+  });
+});
+
+// Fallback for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Uploads directory: ${UPLOADS_DIR}`);
 });
