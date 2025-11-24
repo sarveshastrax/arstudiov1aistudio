@@ -1,15 +1,40 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import { useStore } from './store/useStore';
 import { Installer } from './components/Installer';
 import { Dashboard } from './components/Dashboard';
 import { Editor } from './components/Editor';
 import { Viewer } from './components/Viewer';
 import { api } from './services/api';
-import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2 } from 'lucide-react';
+import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { Project } from './types';
 
-// Sidebar component extracted here for App layout
+// --- GLOBAL ERROR BOUNDARY ---
+class GlobalErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  state: {hasError: boolean, error: Error | null} = { hasError: false, error: null };
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  componentDidCatch(error: Error, errorInfo: any) { console.error("Uncaught error:", error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
+          <AlertTriangle className="text-red-500 mb-4" size={48} />
+          <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
+          <p className="text-neutral-400 mb-6 max-w-md">The application encountered a critical error. This is likely due to a network issue or a missing resource.</p>
+          <div className="bg-neutral-900 p-4 rounded text-left text-xs font-mono text-red-300 mb-6 w-full max-w-lg overflow-auto">
+            {this.state.error?.toString()}
+          </div>
+          <button onClick={() => window.location.reload()} className="bg-white text-black px-6 py-2 rounded font-bold hover:bg-neutral-200">
+            Reload Application
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Sidebar component
 const Sidebar = () => {
   const { logout, currentUser } = useStore();
   
@@ -61,7 +86,7 @@ const NavItem = ({ icon, label, active = false }: { icon: any, label: string, ac
   </button>
 );
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const { isInstalled, currentUser, currentProject, login, _hasHydrated } = useStore();
   const [viewerMode, setViewerMode] = useState<{ active: boolean; projectId?: string; projectData?: Project } | null>(null);
 
@@ -129,7 +154,6 @@ const App: React.FC = () => {
   }
 
   // WAIT FOR HYDRATION (IndexedDB loading)
-  // This prevents flickering of the Installer if persistence hasn't loaded yet
   if (!_hasHydrated) {
     return (
        <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-neutral-500">
@@ -158,7 +182,10 @@ const App: React.FC = () => {
            <p className="text-neutral-400 text-center mb-8 text-sm">Sign in to access your AR Studio dashboard.</p>
            
            <button 
-             onClick={() => login({ id: '1', name: 'Sarvesh', email: 'admin@adhvyk.com', role: 'ADMIN', plan: 'PRO' })}
+             onClick={async () => {
+                const user = await api.login('admin@adhvyk.com');
+                login(user);
+             }}
              className="w-full bg-white text-black font-bold py-3 rounded hover:bg-neutral-200 transition-colors"
            >
              Continue as Admin
@@ -183,5 +210,11 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <GlobalErrorBoundary>
+    <AppContent />
+  </GlobalErrorBoundary>
+);
 
 export default App;
