@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useRef, useLayoutEffect, useEffect, Component } from 'react';
+import React, { Suspense, useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, TransformControls, Grid, Environment, ContactShadows, Gltf, Image as DreiImage, Text } from '@react-three/drei';
 import { useStore } from '../store/useStore';
@@ -20,10 +20,10 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError() {
@@ -31,10 +31,35 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
   
   render() {
-    if (this.state.hasError) return this.props.fallback;
-    return this.props.children;
+    // Fix: Access props via cast to avoid TS error "Property 'props' does not exist"
+    const props = (this as any).props;
+    if (this.state.hasError) return props.fallback;
+    return props.children;
   }
 }
+
+// --- Helper: HTTP-Safe Clipboard Copy ---
+const copyToClipboard = (text: string) => {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text);
+  } else {
+    // Fallback for HTTP/IP addresses
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback: Oops, unable to copy', err);
+    }
+    document.body.removeChild(textArea);
+  }
+};
 
 // --- Modals ---
 
@@ -48,22 +73,13 @@ const PreviewModal: React.FC = () => {
       if (!currentProject) return;
       setLoading(true);
       
-      // Determine best URL Type (Portable vs Server)
-      // Check if we can save to server first
       try {
         await api.saveProject(currentProject);
-        
-        // If save was successful on server, use clean path
-        // We verify crudely by checking if api uses server
-        // In a real app, saveProject should return where it saved
-        
-        // Default to portable for preview to ensure immediate update without caching issues
         const payload = await api.packageProjectForPortableUrl(currentProject);
         const host = window.location.host; 
         const protocol = window.location.protocol;
         setPreviewUrl(`${protocol}//${host}/#/v?p=${payload}`);
       } catch (e) {
-        // Fallback
         const payload = await api.packageProjectForPortableUrl(currentProject);
         const host = window.location.host; 
         const protocol = window.location.protocol;
@@ -139,18 +155,13 @@ const PublishModal: React.FC = () => {
       const host = window.location.host;
       const protocol = window.location.protocol;
 
-      // Check if we are checking against a real server
-      // We do this by checking if api thinks it's server mode
-      // This is a heuristic for the UI
       const isServer = (api as any).useServer; 
 
       if (isServer) {
-         // Generate Clean URL
          const url = `${protocol}//${host}/v/${currentProject.id}`;
          setPublishUrl(url);
          setIsServerUrl(true);
       } else {
-         // Generate Portable URL
          const payload = await api.packageProjectForPortableUrl(currentProject);
          const url = `${protocol}//${host}/#/v?p=${payload}`;
          setPublishUrl(url);
@@ -202,7 +213,7 @@ const PublishModal: React.FC = () => {
             <div className="w-full bg-neutral-900 border border-neutral-800 rounded p-3 flex justify-between items-center gap-2">
               <span className="text-xs text-neutral-400 truncate flex-1 text-left">{publishUrl}</span>
               <button 
-                onClick={() => navigator.clipboard.writeText(publishUrl)}
+                onClick={() => copyToClipboard(publishUrl)}
                 className="text-xs bg-neutral-800 px-3 py-1.5 rounded text-white hover:bg-neutral-700 shrink-0 font-medium"
               >
                 Copy
@@ -443,7 +454,6 @@ const AssetsPanel = () => {
     const intendedType = e.target.getAttribute('data-type'); 
 
     // Use API Service to handle upload
-    // Returns server URL if connected, or Base64 if offline
     const asset = await api.uploadAsset(file);
     
     // Override type if button was specific

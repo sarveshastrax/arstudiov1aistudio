@@ -9,11 +9,9 @@ import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2, AlertT
 import { Project } from './types';
 
 // --- GLOBAL ERROR BOUNDARY ---
-class GlobalErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
-  constructor(props: {children: React.ReactNode}) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+class GlobalErrorBoundary extends React.Component<{children?: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  state = { hasError: false, error: null };
+  
   static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   componentDidCatch(error: Error, errorInfo: any) { console.error("Uncaught error:", error, errorInfo); }
   render() {
@@ -32,7 +30,8 @@ class GlobalErrorBoundary extends Component<{children: React.ReactNode}, {hasErr
         </div>
       );
     }
-    return this.props.children;
+    // Fix: Access props via cast to avoid TS error "Property 'props' does not exist"
+    return (this as any).props.children;
   }
 }
 

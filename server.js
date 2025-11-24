@@ -121,7 +121,8 @@ app.post('/api/projects', (req, res) => {
 });
 
 // --- SPA ROUTING (SSR LITE) ---
-app.get('*', (req, res) => {
+// Use regex /.*/ to match all routes instead of '*' which can cause PathError in newer Express/Router versions
+app.get(/.*/, (req, res) => {
   const indexPath = path.join(BUILD_DIR, 'index.html');
   
   if (req.path.startsWith('/v/')) {

@@ -1,18 +1,21 @@
 import React, { Suspense, useMemo, Component } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, Gltf, Image as DreiImage, Text } from '@react-three/drei';
+import { XR, ARButton } from '@react-three/xr';
 import { useStore } from '../store/useStore';
 import * as THREE from 'three';
-import { Play, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Play, AlertCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { SceneObject, Project } from '../types';
 
 // Error Boundary specifically for the Viewer Scene to prevent whole-app crash
-class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: React.ReactNode }) {
+class SceneErrorBoundary extends React.Component<{ children?: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  constructor(props: { children?: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
   }
+
   static getDerivedStateFromError() { return { hasError: true }; }
+  
   render() {
     if (this.state.hasError) {
       return (
@@ -23,7 +26,8 @@ class SceneErrorBoundary extends Component<{ children: React.ReactNode }, { hasE
         </mesh>
       );
     }
-    return this.props.children;
+    // Fix: Access props via cast to avoid TS error "Property 'props' does not exist"
+    return (this as any).props.children;
   }
 }
 
@@ -67,6 +71,7 @@ interface ViewerProps {
 
 export const Viewer: React.FC<ViewerProps> = ({ projectId, projectData }) => {
   const { projects } = useStore();
+  const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   
   const { project, isFallback } = useMemo(() => {
     if (projectData) return { project: projectData, isFallback: false };
@@ -95,16 +100,17 @@ export const Viewer: React.FC<ViewerProps> = ({ projectId, projectData }) => {
             <h1 className="text-white font-bold text-xl drop-shadow-md tracking-tight">{project.name}</h1>
             <p className="text-white/70 text-xs drop-shadow-md uppercase tracking-wider mt-1">Powered by Adhvyk AR</p>
         </div>
-        <div className="pointer-events-auto">
-             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 text-xs text-white font-medium flex items-center gap-2 shadow-xl">
-                <Play size={12} className="fill-white" /> Live Preview
-             </div>
-        </div>
       </div>
+
+      {/* AR Start Button */}
+      <ARButton 
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 bg-white text-black font-bold py-3 px-8 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed" 
+        sessionInit={{ requiredFeatures: ['hit-test'] }} 
+      />
 
       {/* Fallback Warning */}
       {isFallback && (
-          <div className="absolute bottom-10 left-4 right-4 z-20 pointer-events-none flex justify-center">
+          <div className="absolute bottom-28 left-4 right-4 z-20 pointer-events-none flex justify-center">
             <div className="bg-neutral-900/90 backdrop-blur border border-neutral-800 text-white px-4 py-3 rounded-xl shadow-2xl max-w-sm flex items-center gap-3">
                <div className="bg-yellow-500/20 p-2 rounded-full text-yellow-500">
                  <AlertCircle size={20} />
@@ -117,21 +123,41 @@ export const Viewer: React.FC<ViewerProps> = ({ projectId, projectData }) => {
           </div>
       )}
 
+      {/* Security Warning for HTTP/IP access */}
+      {!isSecure && (
+        <div className="absolute top-20 left-4 right-4 z-50 pointer-events-none flex justify-center">
+            <div className="bg-red-950/90 backdrop-blur border border-red-800 text-white px-4 py-3 rounded-xl shadow-2xl max-w-md flex items-start gap-3 pointer-events-auto">
+               <div className="bg-red-500/20 p-2 rounded-full text-red-500 shrink-0">
+                 <ShieldAlert size={20} />
+               </div>
+               <div>
+                 <p className="font-bold text-sm">Camera Blocked (Insecure Connection)</p>
+                 <p className="text-xs text-neutral-300 mt-1">
+                   Browser security blocks AR on HTTP. 
+                   <br/><strong>Fix:</strong> Use 'https://' or enable "Insecure origins treated as secure" in chrome://flags for this IP.
+                 </p>
+               </div>
+            </div>
+          </div>
+      )}
+
       {/* AR/3D Scene */}
       <Canvas shadows camera={{ position: [0, 2, 5], fov: 50 }}>
-         <color attach="background" args={['#050505']} />
-         <ambientLight intensity={0.7} />
-         <directionalLight position={[5, 10, 7]} intensity={1.5} castShadow />
-         <Environment preset="city" />
-         
-         <SceneErrorBoundary>
-            {project.sceneObjects.map((obj) => (
-                <ViewerObject key={obj.id} obj={obj} />
-            ))}
-         </SceneErrorBoundary>
+         <XR>
+            <color attach="background" args={['#050505']} />
+            <ambientLight intensity={0.7} />
+            <directionalLight position={[5, 10, 7]} intensity={1.5} castShadow />
+            <Environment preset="city" />
+            
+            <SceneErrorBoundary>
+                {project.sceneObjects.map((obj) => (
+                    <ViewerObject key={obj.id} obj={obj} />
+                ))}
+            </SceneErrorBoundary>
 
-         <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={20} blur={2.5} far={4} />
-         <OrbitControls makeDefault autoRotate={false} minPolarAngle={0} maxPolarAngle={Math.PI / 1.75} />
+            <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={20} blur={2.5} far={4} />
+            <OrbitControls makeDefault autoRotate={false} minPolarAngle={0} maxPolarAngle={Math.PI / 1.75} />
+         </XR>
       </Canvas>
     </div>
   );
