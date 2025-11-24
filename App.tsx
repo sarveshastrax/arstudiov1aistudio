@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import { useStore } from './store/useStore';
 import { Installer } from './components/Installer';
 import { Dashboard } from './components/Dashboard';
@@ -9,8 +9,11 @@ import { Layout, Menu, Settings, LogOut, Code, User as UserIcon, Loader2, AlertT
 import { Project } from './types';
 
 // --- GLOBAL ERROR BOUNDARY ---
-class GlobalErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
-  state: {hasError: boolean, error: Error | null} = { hasError: false, error: null };
+class GlobalErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
   static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   componentDidCatch(error: Error, errorInfo: any) { console.error("Uncaught error:", error, errorInfo); }
   render() {

@@ -61,10 +61,10 @@ export const Installer: React.FC = () => {
               </div>
               <p className="text-neutral-400 mb-4">Connecting to local Prisma instance (SQLite/MySQL)...</p>
               <div className="bg-black/50 p-4 rounded-lg font-mono text-xs text-neutral-500 border border-neutral-800">
-                > Running migrations...<br/>
-                > Creating schema...<br/>
-                > Seeding initial data...<br/>
-                > <span className="text-emerald-500">Success.</span>
+                &gt; Running migrations...<br/>
+                &gt; Creating schema...<br/>
+                &gt; Seeding initial data...<br/>
+                &gt; <span className="text-emerald-500">Success.</span>
               </div>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useRef, useLayoutEffect, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useLayoutEffect, useEffect, Component } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, TransformControls, Grid, Environment, ContactShadows, Gltf, Image as DreiImage, Text } from '@react-three/drei';
 import { useStore } from '../store/useStore';
@@ -20,8 +20,11 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false };
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
   static getDerivedStateFromError() {
     return { hasError: true };
